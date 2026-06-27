@@ -18,5 +18,6 @@
 
 ## Key Rules to Prevent Mistakes
 - Never hardcode the Supabase URL or Anon key; always read them from `process.env`.
-- Database schema changes must match the PostgreSQL tables in Supabase (`profiles`, `accounts`, `categories`, `transactions`).
+- Database Schema: Multi-Space architecture via `budget_spaces` and `space_members`. Tables (`accounts`, `categories`, `transactions`) filter data dynamically using a `space_id` context.
+- Currency: All numbers throughout the UI must be formatted using the Philippine Peso symbol (₱) and standard decimal syntax (e.g., ₱1,500.00).
 - Always use proper PostgreSQL foreign keys (`user_id` mapped to `auth.users`) when logging transactions.
