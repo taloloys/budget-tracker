@@ -15,7 +15,7 @@ interface Account {
   balance: number;
 }
 
-interface TransactionModalProps {
+interface AddTransactionModalProps {
   userId: string;
   categories: Category[];
   accounts: Account[];
@@ -23,7 +23,7 @@ interface TransactionModalProps {
   onTransactionAdded: () => void;
 }
 
-export function TransactionModal({ userId, categories, accounts, activeSpaceId, onTransactionAdded }: TransactionModalProps) {
+export function AddTransactionModal({ userId, categories, accounts, activeSpaceId, onTransactionAdded }: AddTransactionModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");

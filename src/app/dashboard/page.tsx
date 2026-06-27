@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { SummaryBanner, Account } from "./SummaryBanner";
-import { TransactionModal } from "./TransactionModal";
+import { AddTransactionModal } from "@/components/AddTransactionModal";
 import { ActivityFeed, Transaction } from "./ActivityFeed";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut, Settings } from "lucide-react";
+import Link from "next/link";
 
 interface Category {
   id: string;
@@ -32,6 +33,11 @@ export default function DashboardPage() {
   const [totalBudget, setTotalBudget] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
 
+  // Onboarding Form State
+  const [newSpaceName, setNewSpaceName] = useState("");
+  const [isShared, setIsShared] = useState(false);
+  const [creatingSpace, setCreatingSpace] = useState(false);
+
   const supabase = createClient();
 
   // 1. First fetch session and spaces
@@ -54,7 +60,6 @@ export default function DashboardPage() {
         .eq("user_id", session.user.id);
         
       if (spacesData && spacesData.length > 0) {
-        // Map data depending on how Supabase returns joined rows (it usually returns an object or array)
         const fetchedSpaces = spacesData
           .map((s: any) => Array.isArray(s.budget_spaces) ? s.budget_spaces[0] : s.budget_spaces)
           .filter(Boolean) as Space[];
@@ -79,7 +84,6 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
-      // Fetch Accounts
       const { data: accData } = await supabase
         .from("accounts")
         .select("id, name, balance")
@@ -89,7 +93,6 @@ export default function DashboardPage() {
       if (accData) setAccounts(accData);
       else setAccounts([]);
 
-      // Fetch Categories
       const { data: catData } = await supabase
         .from("categories")
         .select("id, name, monthly_budget_limit")
@@ -104,7 +107,6 @@ export default function DashboardPage() {
         setTotalBudget(0);
       }
 
-      // Fetch Recent Transactions
       const { data: txData } = await supabase
         .from("transactions")
         .select(`
@@ -121,7 +123,6 @@ export default function DashboardPage() {
         setTransactions([]);
       }
 
-      // Calculate Total Spent this month
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const { data: monthlyTxData } = await supabase
@@ -157,6 +158,38 @@ export default function DashboardPage() {
     window.location.href = "/";
   };
 
+  const handleCreateSpace = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSpaceName.trim() || !userId) return;
+
+    setCreatingSpace(true);
+    try {
+      const { data: newSpaces, error: insertError } = await supabase
+        .from("budget_spaces")
+        .insert([{ name: newSpaceName, is_shared: isShared }])
+        .select();
+
+      if (insertError) throw insertError;
+
+      if (newSpaces && newSpaces.length > 0) {
+        const space = newSpaces[0];
+
+        await supabase.from("space_members").insert({
+          space_id: space.id,
+          user_id: userId
+        });
+
+        setSpaces([space]);
+        setActiveSpaceId(space.id);
+      }
+    } catch (error) {
+      console.error("Error creating space:", error);
+      alert("Failed to create space. Please try again.");
+    } finally {
+      setCreatingSpace(false);
+    }
+  };
+
   if (loading && !activeSpaceId) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -165,6 +198,72 @@ export default function DashboardPage() {
     );
   }
 
+  // --- Onboarding State View ---
+  if (!loading && spaces.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col selection:bg-indigo-500/30">
+        <header className="px-6 py-6 flex justify-between items-center border-b border-white/5">
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
+            BudgetTracker
+          </h1>
+          <button onClick={handleSignOut} className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-white/5 rounded-full transition-colors">
+            <LogOut className="w-4 h-4" />
+          </button>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-zinc-900 border border-white/5 rounded-3xl p-8 space-y-6 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-32 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none" />
+            
+            <div className="relative z-10 text-center space-y-2 mb-8">
+              <h2 className="text-2xl font-bold text-white">
+                Welcome to your Budget Tracker!
+              </h2>
+              <p className="text-zinc-400 text-sm">
+                Let's get started by creating your first tracking space.
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateSpace} className="relative z-10 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-1.5">Space Name</label>
+                <input
+                  type="text"
+                  required
+                  value={newSpaceName}
+                  onChange={(e) => setNewSpaceName(e.target.value)}
+                  placeholder="e.g., Klenth's Personal"
+                  className="w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <label className="flex items-center gap-3 p-4 bg-black/30 border border-white/5 rounded-xl cursor-pointer hover:bg-black/50 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={isShared}
+                  onChange={(e) => setIsShared(e.target.checked)}
+                  className="w-5 h-5 rounded border-white/20 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-black bg-black"
+                />
+                <span className="text-sm font-medium text-zinc-300">
+                  Is this a shared space with your partner?
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={creatingSpace}
+                className="w-full flex justify-center items-center py-3.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+              >
+                {creatingSpace ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Space"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Main Dashboard View ---
   return (
     <div className="min-h-screen bg-black text-white pb-24 lg:pb-12 selection:bg-indigo-500/30">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
@@ -177,12 +276,20 @@ export default function DashboardPage() {
             </h1>
             <p className="text-zinc-500 text-sm">Your financial overview</p>
           </div>
-          <button 
-            onClick={handleSignOut}
-            className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-white/5 rounded-full transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link 
+              href="/dashboard/settings"
+              className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-white/5 rounded-full transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+            </Link>
+            <button 
+              onClick={handleSignOut}
+              className="p-2 text-zinc-400 hover:text-white bg-zinc-900 border border-white/5 rounded-full transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </header>
 
         {/* Space Selector Dropdown / Tabs */}
@@ -222,7 +329,7 @@ export default function DashboardPage() {
 
             {/* Mobile FAB / Desktop Button */}
             {userId && activeSpaceId && (
-              <TransactionModal 
+              <AddTransactionModal 
                 userId={userId} 
                 activeSpaceId={activeSpaceId}
                 categories={categories} 

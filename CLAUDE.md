@@ -10,6 +10,7 @@
 - Use ES modules (`import`/`export`), prefer named exports over default exports.
 - Database queries should utilize the Supabase Browser Client helper (`src/utils/supabase/client.ts`).
 - Keep components modular and mobile-first (optimized for smartphones).
+- Budgets are defined as monthly_budget_limit fields inside the categories table and are modified directly by the user per Space.
 
 ## Common Development Commands
 - Install dependencies: `npm install`
